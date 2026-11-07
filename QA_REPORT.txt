@@ -41,3 +41,14 @@ VALIDATION
 - Reviewed the changed HTML metadata and documentation against the existing launch files and QA notes.
 - No new gameplay runtime behavior was introduced by this pass.
 - Existing Windows manual acceptance tests listed above remain outstanding; this pass does not claim a full playthrough.
+
+
+GAMEPLAY SAFETY / INPUT RELIABILITY PASS
+- Added a shared input-state reset helper and use it when pausing, opening the help overlay, releasing pointer lock for menus, losing window focus, and leaving the page.
+- Game key states are only latched while gameplay is active, preventing menu/background key presses from becoming movement or fire inputs.
+- Added visibility-change handling: when the browser tab becomes hidden, active gameplay is paused and all held inputs are cleared. The player must explicitly resume.
+- Hardened resize handling against zero-sized viewport values and applies the capped pixel ratio before resizing.
+
+VALIDATION STATUS
+- Source changes were applied to the improvement branch and reviewed against the existing event-handler structure.
+- Full browser/Windows runtime tests remain outstanding; no claim of successful manual gameplay validation is made.
