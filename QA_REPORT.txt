@@ -52,3 +52,14 @@ GAMEPLAY SAFETY / INPUT RELIABILITY PASS
 VALIDATION STATUS
 - Source changes were applied to the improvement branch and reviewed against the existing event-handler structure.
 - Full browser/Windows runtime tests remain outstanding; no claim of successful manual gameplay validation is made.
+
+
+RENDERING / PERFORMANCE PASS
+- Added conservative adaptive render resolution: the renderer samples average frame rate over 2.5-second windows and adjusts device pixel ratio gradually. It reduces resolution when measured frame rate falls below 50 FPS, reacts more strongly below 42 FPS, and slowly restores detail above 59 FPS. A cooldown prevents rapid oscillation. The upper DPR remains capped at 1.6 and the lower bound is 0.85 (or the device's native DPR when lower).
+- Reduced the directional shadow map from 1536² to 1024² to reduce shadow rendering cost while retaining soft shadows.
+- Removed redundant pixel-ratio resets on window resize; adaptive quality now owns render resolution.
+- Kept the existing scene, lighting model, camera, world content, materials, gameplay and controls otherwise unchanged.
+
+VALIDATION STATUS
+- Changes are present on the improvement branch.
+- Runtime GPU benchmarks and visual comparisons across integrated/discrete GPUs have not yet been performed. Adaptive thresholds are conservative starting values, not a claim of measured FPS gains on every device.
