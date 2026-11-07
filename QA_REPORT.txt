@@ -63,3 +63,14 @@ RENDERING / PERFORMANCE PASS
 VALIDATION STATUS
 - Changes are present on the improvement branch.
 - Runtime GPU benchmarks and visual comparisons across integrated/discrete GPUs have not yet been performed. Adaptive thresholds are conservative starting values, not a claim of measured FPS gains on every device.
+
+
+CITY ENVIRONMENT / ROAD SHAPE PASS
+- Rebuilt road ribbons using centripetal Catmull-Rom resampling and smooth tangent-based cross sections. Road surfaces now follow continuous curves instead of connecting coarse control points with visibly angular trapezoids; lane dashes are placed along the resampled centerline.
+- Reworked street trees into layered broadleaf forms with tapered trunks, visible limbs and overlapping rounded crowns. Tree bases now follow cityGroundHeight so they sit on the local terrain instead of a fixed world height.
+- Corrected building parcel orientation to align each building's long side with the local street tangent, using the world/local axis convention of the building geometry. Updated road-sample orientation consistently for nearby parcel placement.
+- Preserved existing district layout, road paths, building placement logic and overall art direction.
+
+VALIDATION STATUS
+- Source changes are committed to the improvement branch.
+- Visual inspection in a running browser and vehicle-driving checks through curved roads are still required. The road resampling increases geometry smoothness; runtime performance and terrain edge cases have not yet been benchmarked.
