@@ -236,7 +236,7 @@ function sampleStreetPath(route) {
   const pts=curve.getPoints(Math.max(40,route.points.length*4)).map(v=>[v.x,v.z]);
   cityRoadPaths.push({name:route.name,kind:route.kind,width:route.width,points:pts});
   const step=Math.max(1,Math.floor(pts.length/140));
-  for(let i=0;i<pts.length;i+=step){const a=pts[Math.max(0,i-1)],b=pts[Math.min(pts.length-1,i+1)];cityRoadSamples.push({x:pts[i][0],z:pts[i][1],yaw:Math.atan2(b[0]-a[0],b[1]-a[1]),width:route.width,route:cityRoadPaths.length-1,index:i});}
+  for(let i=0;i<pts.length;i+=step){const a=pts[Math.max(0,i-1)],b=pts[Math.min(pts.length-1,i+1)];cityRoadSamples.push({x:pts[i][0],z:pts[i][1],yaw:Math.atan2(-(b[1]-a[1]),b[0]-a[0]),width:route.width,route:cityRoadPaths.length-1,index:i});}
   return pts;
 }
 function addOrganicStreets() {
@@ -444,10 +444,37 @@ function createBuildingInterior(building){
 
 
 function addTree(x,z,scale=1) {
+  // A layered broadleaf tree: tapered trunk, a few visible limbs and overlapping
+  // rounded crowns. Shared low-poly sphere geometry keeps the extra detail cheap.
   const group=new THREE.Group();
-  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.35*scale,.52*scale,2.7*scale,7),mats.trunk); trunk.position.y=1.25*scale; group.add(trunk);
-  const crown=new THREE.Mesh(new THREE.IcosahedronGeometry(2.05*scale,1),pick([mats.tree,mat(0x326b52),mat(0x244e42)])); crown.position.y=3.1*scale; crown.castShadow=true; group.add(crown);
-  group.position.set(x,0,z); scene.add(group);
+  const crownGeo=addTree.crownGeo||(addTree.crownGeo=new THREE.SphereGeometry(1,12,9));
+  const trunkGeo=addTree.trunkGeo||(addTree.trunkGeo=new THREE.CylinderGeometry(.22,.39,3.15,9,1));
+  const trunk=new THREE.Mesh(trunkGeo,mats.trunk);
+  trunk.scale.setScalar(scale);trunk.position.y=1.48*scale;trunk.castShadow=true;trunk.receiveShadow=true;group.add(trunk);
+  const limbMat=mats.trunk;
+  for(const side of [-1,1]){
+    const limb=new THREE.Mesh(new THREE.CylinderGeometry(.075*scale,.13*scale,1.25*scale,6),limbMat);
+    limb.position.set(side*.43*scale,2.05*scale,.02*scale);
+    limb.rotation.z=side*.58;limb.rotation.x=side*.12;limb.castShadow=true;group.add(limb);
+  }
+  const greens=[mats.tree,mat(0x39734e),mat(0x2f6245),mat(0x527d4e)];
+  const crownMat=pick(greens);
+  const clusters=[
+    [0,3.65,0,1.52,1.28,1.42],
+    [-.88,3.18,.12,1.02,.92,1.04],
+    [.88,3.25,-.08,1.08,.98,1.02],
+    [-.28,4.35,.12,.98,.94,.98],
+    [.62,4.18,.16,.92,.88,.92]
+  ];
+  for(const [cx,cy,cz,sx,sy,sz] of clusters){
+    const crown=new THREE.Mesh(crownGeo,crownMat);
+    crown.position.set(cx*scale,cy*scale,cz*scale);
+    crown.scale.set(sx*scale,sy*scale,sz*scale);
+    crown.castShadow=true;crown.receiveShadow=true;group.add(crown);
+  }
+  group.position.set(x,cityGroundHeight(x,z),z);
+  group.rotation.y=rand(0,Math.PI*2);
+  scene.add(group);
 }
 
 function addCityLandmarks(){
@@ -544,7 +571,7 @@ function generateCity() {
     const pts=route.points;
     const stride=route.kind==='oldtown'?3:route.kind==='market'?4:5;
     for(let i=3;i<pts.length-3;i+=stride){
-      const a=pts[i-1],b=pts[i+1],dx=b[0]-a[0],dz=b[1]-a[1],len=Math.hypot(dx,dz)||1,yaw=Math.atan2(dx,dz);
+      const a=pts[i-1],b=pts[i+1],dx=b[0]-a[0],dz=b[1]-a[1],len=Math.hypot(dx,dz)||1,yaw=Math.atan2(-dz,dx);
       for(const side of [-1,1]){
         const along=rand(-10,10),depth=route.kind==='oldtown'?rand(18,29):rand(23,42),width=route.kind==='oldtown'?rand(16,28):rand(22,42);
         const offset=route.width*.5+depth*.5+rand(5,13),x=pts[i][0]-dz/len*offset*side+dx/len*along,z=pts[i][1]+dx/len*offset*side+dz/len*along;
@@ -649,32 +676,50 @@ function addEastTerrainPatch() {
 
 function addRoadRibbon(points,width,material,heightFn=()=>0,yOffset=.18,markings=false) {
   if(points.length<2)return;
-  const vertices=[],indices=[];let totalLength=0;const cumulative=[0];
-  for(let i=0;i<points.length-1;i++){
-    const a=points[i],b=points[i+1],dx=b[0]-a[0],dz=b[1]-a[1],len=Math.hypot(dx,dz)||1;
-    const px=dz/len*width/2,pz=-dx/len*width/2;
-    const start=vertices.length/3;
-    vertices.push(
-      a[0]+px,heightFn(a[0]+px,a[1]+pz)+yOffset,a[1]+pz,
-      a[0]-px,heightFn(a[0]-px,a[1]-pz)+yOffset,a[1]-pz,
-      b[0]+px,heightFn(b[0]+px,b[1]+pz)+yOffset,b[1]+pz,
-      b[0]-px,heightFn(b[0]-px,b[1]-pz)+yOffset,b[1]-pz
-    );
-    indices.push(start,start+2,start+1,start+1,start+2,start+3);
-    totalLength+=len;cumulative.push(totalLength);
+  // Resample with a centripetal Catmull-Rom curve so road edges and sidewalks
+  // turn continuously instead of forming angular, overlapping trapezoids.
+  const controls=points.map(p=>new THREE.Vector3(p[0],0,p[1]));
+  const curve=new THREE.CatmullRomCurve3(controls,false,'centripetal');
+  const totalLength=Math.max(1,curve.getLength());
+  const sampleCount=clamp(Math.ceil(totalLength/4),Math.max(8,points.length*2),2600);
+  const samples=curve.getSpacedPoints(sampleCount);
+  const vertices=[],indices=[],cumulative=[0];
+  let distance=0;
+  for(let i=0;i<samples.length;i++){
+    const p=samples[i];
+    const tangent=curve.getTangentAt(i/sampleCount).normalize();
+    const px=tangent.z*width*.5,pz=-tangent.x*width*.5;
+    const lx=p.x+px,lz=p.z+pz,rx=p.x-px,rz=p.z-pz;
+    vertices.push(lx,heightFn(lx,lz)+yOffset,lz,rx,heightFn(rx,rz)+yOffset,rz);
+    if(i>0){
+      const prev=samples[i-1];distance+=Math.hypot(p.x-prev.x,p.z-prev.z);cumulative.push(distance);
+      const a=(i-1)*2,b=a+1,c=i*2,d=c+1;
+      indices.push(a,c,b,b,c,d);
+    }
   }
-  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geo.setIndex(indices);geo.computeVertexNormals();
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+  geo.setIndex(indices);geo.computeVertexNormals();
   const ribbon=new THREE.Mesh(geo,material);ribbon.receiveShadow=true;scene.add(ribbon);
   if(markings){
-    const marks=[];let nextAt=10;
-    for(let i=0;i<points.length-1&&nextAt<totalLength-3;i++){
-      const a=points[i],b=points[i+1],dx=b[0]-a[0],dz=b[1]-a[1],len=Math.hypot(dx,dz)||1;
-      while(nextAt<=cumulative[i+1]&&nextAt<totalLength-3){
-        if(nextAt>=cumulative[i]-1e-6){const t=clamp((nextAt-cumulative[i])/len,0,1),x=a[0]+dx*t,z=a[1]+dz*t,y=heightFn(x,z)+yOffset+.035;marks.push({x,y,z,yaw:Math.atan2(dx,dz),slope:Math.atan2(-(heightFn(b[0],b[1])-heightFn(a[0],a[1])),len)});}
-        nextAt+=27;
-      }
+    const marks=[];let nextAt=10,segment=1;
+    while(nextAt<distance-3&&segment<cumulative.length){
+      while(segment<cumulative.length&&cumulative[segment]<nextAt)segment++;
+      if(segment>=cumulative.length)break;
+      const a=samples[segment-1],b=samples[segment],span=Math.max(.001,cumulative[segment]-cumulative[segment-1]);
+      const t=clamp((nextAt-cumulative[segment-1])/span,0,1);
+      const x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t;
+      const dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz)||1;
+      const slope=Math.atan2(-(heightFn(b.x,b.z)-heightFn(a.x,a.z)),len);
+      marks.push({x,y:heightFn(x,z)+yOffset+.035,z,yaw:Math.atan2(dx,dz),slope});
+      nextAt+=27;
     }
-    if(marks.length){const dashGeo=new THREE.BoxGeometry(.18,.035,3.5),dashMesh=new THREE.InstancedMesh(dashGeo,mats.lane,marks.length),dummy=new THREE.Object3D();marks.forEach((m,i)=>{dummy.position.set(m.x,m.y,m.z);dummy.rotation.set(m.slope,m.yaw,0);dummy.updateMatrix();dashMesh.setMatrixAt(i,dummy.matrix);});dashMesh.instanceMatrix.needsUpdate=true;dashMesh.computeBoundingSphere();scene.add(dashMesh);}
+    if(marks.length){
+      const dashGeo=new THREE.BoxGeometry(.18,.035,3.5);
+      const dashMesh=new THREE.InstancedMesh(dashGeo,mats.lane,marks.length),dummy=new THREE.Object3D();
+      marks.forEach((m,i)=>{dummy.position.set(m.x,m.y,m.z);dummy.rotation.set(m.slope,m.yaw,0);dummy.updateMatrix();dashMesh.setMatrixAt(i,dummy.matrix);});
+      dashMesh.instanceMatrix.needsUpdate=true;dashMesh.computeBoundingSphere();scene.add(dashMesh);
+    }
   }
 }
 function addParkingLot() {
