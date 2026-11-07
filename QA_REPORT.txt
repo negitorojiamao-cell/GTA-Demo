@@ -29,3 +29,15 @@ LIMITATIONS / NOT CLAIMED
 - Syntax and ZIP integrity checks do not replace the above manual acceptance tests.
 - Three.js is loaded from a CDN, so initial execution requires internet access.
 - This is an original GTA-inspired prototype; it is not a complete reproduction of all GTA V systems.
+
+
+DOCUMENTATION / ACCESSIBILITY POLISH
+- Added a complete Japanese README with Windows setup, controls, feature scope, environment requirements and honest test limitations.
+- Added TROUBLESHOOTING.md for startup, CDN, WebGL, input, performance and local-server issues.
+- Removed the viewport setting that disabled pinch/browser zoom; added a Japanese page description and dark color-scheme metadata.
+- Core world/gameplay code and original art/layout were intentionally left unchanged in this pass.
+
+VALIDATION
+- Reviewed the changed HTML metadata and documentation against the existing launch files and QA notes.
+- No new gameplay runtime behavior was introduced by this pass.
+- Existing Windows manual acceptance tests listed above remain outstanding; this pass does not claim a full playthrough.
