@@ -114,8 +114,34 @@ scene.background = new THREE.Color(0x8c9da4);
 scene.fog = new THREE.FogExp2(0x8c9da4, 0.00105);
 const camera = new THREE.PerspectiveCamera(67, 1, 0.1, 2400);
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
+// Adaptive render resolution: preserve crisp output on fast systems and lower GPU
+// pixel cost gradually when the scene becomes expensive. DPR is never allowed to
+// exceed 1.6, and hysteresis avoids quality oscillation around the target frame rate.
+const maxRenderPixelRatio = Math.min(window.devicePixelRatio || 1, 1.6);
+const minRenderPixelRatio = Math.min(maxRenderPixelRatio, 0.85);
+let renderPixelRatio = maxRenderPixelRatio;
+let renderSampleTime = 0, renderSampleFrames = 0;
+let renderQualityCooldown = 0;
+renderer.setPixelRatio(renderPixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
+function updateAdaptiveRenderQuality(dt) {
+  renderSampleTime += dt;
+  renderSampleFrames++;
+  renderQualityCooldown = Math.max(0, renderQualityCooldown - dt);
+  if (renderSampleTime < 2.5 || renderQualityCooldown > 0) return;
+  const fps = renderSampleFrames / Math.max(.001, renderSampleTime);
+  let nextRatio = renderPixelRatio;
+  if (fps < 42) nextRatio = Math.max(minRenderPixelRatio, renderPixelRatio - .16);
+  else if (fps < 50) nextRatio = Math.max(minRenderPixelRatio, renderPixelRatio - .08);
+  else if (fps > 59) nextRatio = Math.min(maxRenderPixelRatio, renderPixelRatio + .05);
+  if (Math.abs(nextRatio - renderPixelRatio) >= .015) {
+    renderPixelRatio = nextRatio;
+    renderer.setPixelRatio(renderPixelRatio);
+    renderQualityCooldown = 3.5;
+  }
+  renderSampleTime = 0;
+  renderSampleFrames = 0;
+}
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -127,7 +153,7 @@ scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffdfbb, 2.1);
 sun.position.set(-250, 420, 180);
 sun.castShadow = true;
-sun.shadow.mapSize.set(1536, 1536);
+sun.shadow.mapSize.set(1024, 1024); // Lower shadow fill cost while retaining soft directional shadows.
 sun.shadow.camera.left = -520; sun.shadow.camera.right = 520;
 sun.shadow.camera.top = 520; sun.shadow.camera.bottom = -520;
 sun.shadow.camera.near = 10; sun.shadow.camera.far = 1050;
@@ -210,7 +236,7 @@ function sampleStreetPath(route) {
   const pts=curve.getPoints(Math.max(40,route.points.length*4)).map(v=>[v.x,v.z]);
   cityRoadPaths.push({name:route.name,kind:route.kind,width:route.width,points:pts});
   const step=Math.max(1,Math.floor(pts.length/140));
-  for(let i=0;i<pts.length;i+=step){const a=pts[Math.max(0,i-1)],b=pts[Math.min(pts.length-1,i+1)];cityRoadSamples.push({x:pts[i][0],z:pts[i][1],yaw:Math.atan2(b[0]-a[0],b[1]-a[1]),width:route.width,route:cityRoadPaths.length-1,index:i});}
+  for(let i=0;i<pts.length;i+=step){const a=pts[Math.max(0,i-1)],b=pts[Math.min(pts.length-1,i+1)];cityRoadSamples.push({x:pts[i][0],z:pts[i][1],yaw:Math.atan2(-(b[1]-a[1]),b[0]-a[0]),width:route.width,route:cityRoadPaths.length-1,index:i});}
   return pts;
 }
 function addOrganicStreets() {
@@ -355,6 +381,66 @@ function addBuilding(x,z,bw,bd,height,index,options={}) {
   else if(style==='historic'&&height<32) mesh=new THREE.Mesh(new THREE.BoxGeometry(bw,height,bd),new THREE.MeshStandardMaterial({color:chosen,roughness:.94}));
   else mesh=new THREE.Mesh(new THREE.BoxGeometry(bw,height,bd),buildingMaterial);
   mesh.position.y=height/2;mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);
+  // Manhattan-inspired architecture: distinct massing profiles and facade rhythms,
+  // rather than repeating one rectangular tower with a different window color.
+  const trimMat=mat(style==='prewar'?0xb6a58d:style==='artdeco'?0xc4ad82:0x68777b,.68,.22);
+  const glassAccent=mat(style==='curtainwall'?0x456a78:0x8da7aa,.28,.42);
+  const addTier=(w,d,h,y,material=buildingMaterial)=>{
+    const tier=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);
+    tier.position.set(0,y+h/2,0);tier.castShadow=true;tier.receiveShadow=true;group.add(tier);return tier;
+  };
+  if(height>48 && ['setback','prewar','curtainwall','brutalist','postmodern','pencil'].includes(style)){
+    if(style==='setback'||style==='prewar'||style==='postmodern'){
+      const levels=style==='prewar'?3:2;
+      let previousW=bw,previousD=bd,base=height*(style==='prewar'?.54:.62);
+      for(let tier=0;tier<levels;tier++){
+        const nextW=previousW*rand(.72,.88),nextD=previousD*rand(.74,.9),tierH=height*(style==='prewar'?.14:.18);
+        addTier(nextW,nextD,tierH,base+tier*tierH,buildingMaterial);
+        // Cornice / setback ledges make the profile read clearly against the skyline.
+        const ledge=new THREE.Mesh(new THREE.BoxGeometry(previousW*.99,.55,previousD*.99),trimMat);
+        ledge.position.y=base+tier*tierH+.12;group.add(ledge);
+        previousW=nextW;previousD=nextD;
+      }
+    }else if(style==='brutalist'){
+      const tiers=3;let w=bw*.92,d=bd*.92,y=height*.48;
+      for(let i=0;i<tiers;i++){
+        const h=height*.16;addTier(w,d,h,y,buildingMaterial);
+        const ledge=new THREE.Mesh(new THREE.BoxGeometry(w*1.035,.65,d*1.035),trimMat);ledge.position.y=y+.2;group.add(ledge);
+        w*=rand(.78,.9);d*=rand(.78,.9);y+=h;
+      }
+    }else if(style==='pencil'){
+      // Slender tower with a compact crown and a clearly visible mechanical penthouse.
+      const upper=new THREE.Mesh(new THREE.BoxGeometry(bw*.68,height*.78,bd*.7),buildingMaterial);
+      upper.position.y=height*.89;upper.castShadow=true;upper.receiveShadow=true;group.add(upper);
+      const crown=new THREE.Mesh(new THREE.BoxGeometry(bw*.48,Math.min(12,height*.08),bd*.5),trimMat);
+      crown.position.y=height*1.3;group.add(crown);
+    }
+    if(style==='curtainwall'){
+      // Slim vertical mullions and horizontal spandrels produce a glass office facade.
+      const mullionCount=clamp(Math.floor(bw/3.8),4,13);
+      for(let i=0;i<mullionCount;i++){
+        const xx=-bw*.46+i*(bw*.92/Math.max(1,mullionCount-1));
+        const mullion=new THREE.Mesh(new THREE.BoxGeometry(.16,height*.94,.18),glassAccent);
+        mullion.position.set(xx,height*.5,bd/2+.13);group.add(mullion);
+      }
+      for(let y=8;y<height-3;y+=rand(7,10)){
+        const spandrel=new THREE.Mesh(new THREE.BoxGeometry(bw*1.005,.22,.2),trimMat);
+        spandrel.position.set(0,y,bd/2+.14);group.add(spandrel);
+      }
+    }
+    if(style==='prewar'){
+      // Limestone piers and a pronounced cornice evoke older Manhattan office blocks.
+      const piers=Math.max(3,Math.floor(bw/5));
+      for(let i=0;i<piers;i++){
+        const xx=-bw*.44+i*(bw*.88/Math.max(1,piers-1));
+        const pier=new THREE.Mesh(new THREE.BoxGeometry(.55,height*.88,.48),trimMat);
+        pier.position.set(xx,height*.47,bd/2+.2);group.add(pier);
+      }
+      const cornice=new THREE.Mesh(new THREE.BoxGeometry(bw*1.12,1.5,bd*1.12),trimMat);
+      cornice.position.y=height*.56;group.add(cornice);
+    }
+  }
+
   // Distinct podium, facade piers, floor bands and entrances create different building silhouettes.
   if(style!=='cylindrical'){
     const podiumH=Math.min(4.2,height*.16),podium=new THREE.Mesh(new THREE.BoxGeometry(bw*1.035,podiumH,bd*1.035),mat(style==='brick'?0x6f5146:0x697477,.9,.08));podium.position.y=podiumH/2+.05;group.add(podium);
@@ -418,10 +504,37 @@ function createBuildingInterior(building){
 
 
 function addTree(x,z,scale=1) {
+  // A layered broadleaf tree: tapered trunk, a few visible limbs and overlapping
+  // rounded crowns. Shared low-poly sphere geometry keeps the extra detail cheap.
   const group=new THREE.Group();
-  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.35*scale,.52*scale,2.7*scale,7),mats.trunk); trunk.position.y=1.25*scale; group.add(trunk);
-  const crown=new THREE.Mesh(new THREE.IcosahedronGeometry(2.05*scale,1),pick([mats.tree,mat(0x326b52),mat(0x244e42)])); crown.position.y=3.1*scale; crown.castShadow=true; group.add(crown);
-  group.position.set(x,0,z); scene.add(group);
+  const crownGeo=addTree.crownGeo||(addTree.crownGeo=new THREE.SphereGeometry(1,12,9));
+  const trunkGeo=addTree.trunkGeo||(addTree.trunkGeo=new THREE.CylinderGeometry(.22,.39,3.15,9,1));
+  const trunk=new THREE.Mesh(trunkGeo,mats.trunk);
+  trunk.scale.setScalar(scale);trunk.position.y=1.48*scale;trunk.castShadow=true;trunk.receiveShadow=true;group.add(trunk);
+  const limbMat=mats.trunk;
+  for(const side of [-1,1]){
+    const limb=new THREE.Mesh(new THREE.CylinderGeometry(.075*scale,.13*scale,1.25*scale,6),limbMat);
+    limb.position.set(side*.43*scale,2.05*scale,.02*scale);
+    limb.rotation.z=side*.58;limb.rotation.x=side*.12;limb.castShadow=true;group.add(limb);
+  }
+  const greens=[mats.tree,mat(0x39734e),mat(0x2f6245),mat(0x527d4e)];
+  const crownMat=pick(greens);
+  const clusters=[
+    [0,3.65,0,1.52,1.28,1.42],
+    [-.88,3.18,.12,1.02,.92,1.04],
+    [.88,3.25,-.08,1.08,.98,1.02],
+    [-.28,4.35,.12,.98,.94,.98],
+    [.62,4.18,.16,.92,.88,.92]
+  ];
+  for(const [cx,cy,cz,sx,sy,sz] of clusters){
+    const crown=new THREE.Mesh(crownGeo,crownMat);
+    crown.position.set(cx*scale,cy*scale,cz*scale);
+    crown.scale.set(sx*scale,sy*scale,sz*scale);
+    crown.castShadow=true;crown.receiveShadow=true;group.add(crown);
+  }
+  group.position.set(x,cityGroundHeight(x,z),z);
+  group.rotation.y=rand(0,Math.PI*2);
+  scene.add(group);
 }
 
 function addCityLandmarks(){
@@ -518,18 +631,21 @@ function generateCity() {
     const pts=route.points;
     const stride=route.kind==='oldtown'?3:route.kind==='market'?4:5;
     for(let i=3;i<pts.length-3;i+=stride){
-      const a=pts[i-1],b=pts[i+1],dx=b[0]-a[0],dz=b[1]-a[1],len=Math.hypot(dx,dz)||1,yaw=Math.atan2(dx,dz);
+      const a=pts[i-1],b=pts[i+1],dx=b[0]-a[0],dz=b[1]-a[1],len=Math.hypot(dx,dz)||1,yaw=Math.atan2(-dz,dx);
       for(const side of [-1,1]){
         const along=rand(-10,10),depth=route.kind==='oldtown'?rand(18,29):rand(23,42),width=route.kind==='oldtown'?rand(16,28):rand(22,42);
         const offset=route.width*.5+depth*.5+rand(5,13),x=pts[i][0]-dz/len*offset*side+dx/len*along,z=pts[i][1]+dx/len*offset*side+dz/len*along;
         if(!lotFree(x,z,width,depth,yaw))continue;
         const radius=Math.hypot(x,z);let h;
         if(route.kind==='oldtown')h=rand(8,25);
-        else if(radius<420)h=rand(32,105);
+        else if(radius<420)h=rand(48,132);
         else h=rand(10,47);
-        if(radius<320&&rng()<.22)h=rand(105,175);
+        // Dense central business district: a varied skyline with a few much taller
+        // signature towers, mid-rise prewar blocks and slender pencil towers.
+        if(radius<360&&rng()<.34)h=rand(125,225);
+        else if(radius<420&&rng()<.16)h=rand(95,155);
         if(route.kind==='market'&&rng()<.48)h=rand(8,20);
-        const styles=route.kind==='oldtown'?['historic','brick','concrete']:radius<420?['glass','modern','artdeco','cylindrical','slab']:['concrete','brick','modern','slab'];
+        const styles=route.kind==='oldtown'?['historic','brick','prewar','concrete']:radius<420?['curtainwall','setback','prewar','pencil','brutalist','postmodern','glass','artdeco','slab']:['concrete','brick','modern','prewar','slab'];
         const style=pick(styles);
         addBuilding(x,z,width,depth,h,index++,{yaw,style});
       }
@@ -541,7 +657,7 @@ function generateCity() {
     const nearest=cityRoadSamples.reduce((best,q)=>Math.hypot(x-q.x,z-q.z)<best.d?{d:Math.hypot(x-q.x,z-q.z),q}:best,{d:Infinity,q:null});
     if(!lotFree(x,z,w,d,nearest.q?nearest.q.yaw:0))continue;
     if(!nearest.q||nearest.d>145)continue;
-    const h=rad<400?rand(35,125):rand(10,44),style=pick(rad<400?['glass','modern','artdeco','cylindrical','slab']:['brick','concrete','modern','historic']);
+    const h=rad<400?rand(48,145):rand(10,44),style=pick(rad<400?['curtainwall','setback','prewar','pencil','brutalist','postmodern','glass','artdeco','slab']:['brick','concrete','modern','historic','prewar']);
     addBuilding(x,z,w,d,h,index++,{yaw:nearest.q.yaw+rand(-.35,.35),style});placed++;
   }
   // Close sparse city-edge gaps with compact, varied perimeter blocks. Keep the whole footprint inside bounds.
@@ -623,32 +739,50 @@ function addEastTerrainPatch() {
 
 function addRoadRibbon(points,width,material,heightFn=()=>0,yOffset=.18,markings=false) {
   if(points.length<2)return;
-  const vertices=[],indices=[];let totalLength=0;const cumulative=[0];
-  for(let i=0;i<points.length-1;i++){
-    const a=points[i],b=points[i+1],dx=b[0]-a[0],dz=b[1]-a[1],len=Math.hypot(dx,dz)||1;
-    const px=dz/len*width/2,pz=-dx/len*width/2;
-    const start=vertices.length/3;
-    vertices.push(
-      a[0]+px,heightFn(a[0]+px,a[1]+pz)+yOffset,a[1]+pz,
-      a[0]-px,heightFn(a[0]-px,a[1]-pz)+yOffset,a[1]-pz,
-      b[0]+px,heightFn(b[0]+px,b[1]+pz)+yOffset,b[1]+pz,
-      b[0]-px,heightFn(b[0]-px,b[1]-pz)+yOffset,b[1]-pz
-    );
-    indices.push(start,start+2,start+1,start+1,start+2,start+3);
-    totalLength+=len;cumulative.push(totalLength);
+  // Resample with a centripetal Catmull-Rom curve so road edges and sidewalks
+  // turn continuously instead of forming angular, overlapping trapezoids.
+  const controls=points.map(p=>new THREE.Vector3(p[0],0,p[1]));
+  const curve=new THREE.CatmullRomCurve3(controls,false,'centripetal');
+  const totalLength=Math.max(1,curve.getLength());
+  const sampleCount=clamp(Math.ceil(totalLength/4),Math.max(8,points.length*2),2600);
+  const samples=curve.getSpacedPoints(sampleCount);
+  const vertices=[],indices=[],cumulative=[0];
+  let distance=0;
+  for(let i=0;i<samples.length;i++){
+    const p=samples[i];
+    const tangent=curve.getTangentAt(i/sampleCount).normalize();
+    const px=tangent.z*width*.5,pz=-tangent.x*width*.5;
+    const lx=p.x+px,lz=p.z+pz,rx=p.x-px,rz=p.z-pz;
+    vertices.push(lx,heightFn(lx,lz)+yOffset,lz,rx,heightFn(rx,rz)+yOffset,rz);
+    if(i>0){
+      const prev=samples[i-1];distance+=Math.hypot(p.x-prev.x,p.z-prev.z);cumulative.push(distance);
+      const a=(i-1)*2,b=a+1,c=i*2,d=c+1;
+      indices.push(a,c,b,b,c,d);
+    }
   }
-  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geo.setIndex(indices);geo.computeVertexNormals();
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+  geo.setIndex(indices);geo.computeVertexNormals();
   const ribbon=new THREE.Mesh(geo,material);ribbon.receiveShadow=true;scene.add(ribbon);
   if(markings){
-    const marks=[];let nextAt=10;
-    for(let i=0;i<points.length-1&&nextAt<totalLength-3;i++){
-      const a=points[i],b=points[i+1],dx=b[0]-a[0],dz=b[1]-a[1],len=Math.hypot(dx,dz)||1;
-      while(nextAt<=cumulative[i+1]&&nextAt<totalLength-3){
-        if(nextAt>=cumulative[i]-1e-6){const t=clamp((nextAt-cumulative[i])/len,0,1),x=a[0]+dx*t,z=a[1]+dz*t,y=heightFn(x,z)+yOffset+.035;marks.push({x,y,z,yaw:Math.atan2(dx,dz),slope:Math.atan2(-(heightFn(b[0],b[1])-heightFn(a[0],a[1])),len)});}
-        nextAt+=27;
-      }
+    const marks=[];let nextAt=10,segment=1;
+    while(nextAt<distance-3&&segment<cumulative.length){
+      while(segment<cumulative.length&&cumulative[segment]<nextAt)segment++;
+      if(segment>=cumulative.length)break;
+      const a=samples[segment-1],b=samples[segment],span=Math.max(.001,cumulative[segment]-cumulative[segment-1]);
+      const t=clamp((nextAt-cumulative[segment-1])/span,0,1);
+      const x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t;
+      const dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz)||1;
+      const slope=Math.atan2(-(heightFn(b.x,b.z)-heightFn(a.x,a.z)),len);
+      marks.push({x,y:heightFn(x,z)+yOffset+.035,z,yaw:Math.atan2(dx,dz),slope});
+      nextAt+=27;
     }
-    if(marks.length){const dashGeo=new THREE.BoxGeometry(.18,.035,3.5),dashMesh=new THREE.InstancedMesh(dashGeo,mats.lane,marks.length),dummy=new THREE.Object3D();marks.forEach((m,i)=>{dummy.position.set(m.x,m.y,m.z);dummy.rotation.set(m.slope,m.yaw,0);dummy.updateMatrix();dashMesh.setMatrixAt(i,dummy.matrix);});dashMesh.instanceMatrix.needsUpdate=true;dashMesh.computeBoundingSphere();scene.add(dashMesh);}
+    if(marks.length){
+      const dashGeo=new THREE.BoxGeometry(.18,.035,3.5);
+      const dashMesh=new THREE.InstancedMesh(dashGeo,mats.lane,marks.length),dummy=new THREE.Object3D();
+      marks.forEach((m,i)=>{dummy.position.set(m.x,m.y,m.z);dummy.rotation.set(m.slope,m.yaw,0);dummy.updateMatrix();dashMesh.setMatrixAt(i,dummy.matrix);});
+      dashMesh.instanceMatrix.needsUpdate=true;dashMesh.computeBoundingSphere();scene.add(dashMesh);
+    }
   }
 }
 function addParkingLot() {
@@ -1687,6 +1821,7 @@ function recenterCamera() {
 function animate() {
   requestAnimationFrame(animate);
   const dt=Math.min(clock.getDelta(),.05);
+  updateAdaptiveRenderQuality(dt);
   if(started&&!paused) {
     gameTime+=dt;
     updatePlayer(dt);updateTraffic(dt);updatePedestrians(dt);updateAircraft(dt);updateAirportAirliners(dt);updatePolice(dt);updateBombs(dt);updateExplosions(dt);updateEnemies(dt);updateMission(dt);updateWanted(dt);updateEffects(dt);
@@ -1704,15 +1839,19 @@ function startGame() {
   if(started)return; started=true;paused=false;$('start-overlay').classList.add('hidden');$('loading').classList.add('done');
   showToast('街へようこそ — 画面をクリックしてマウス視点を有効化 / Cで後方視点');
 }
+function clearInputState() {
+  mouseDown=false; cameraDrag=false;
+  for(const code of Object.keys(keys)) keys[code]=false;
+}
 function pauseGame() {
-  if(!started)return;paused=true;mouseDown=false;$('pause-overlay').classList.remove('hidden');
+  if(!started)return;paused=true;clearInputState();$('pause-overlay').classList.remove('hidden');
   if(document.pointerLockElement)document.exitPointerLock();
 }
 function resumeGame() {
   paused=false;$('pause-overlay').classList.add('hidden');
 }
 function openHelp() {
-  $('help-overlay').classList.remove('hidden');mouseDown=false;
+  $('help-overlay').classList.remove('hidden');clearInputState();
   if(document.pointerLockElement)document.exitPointerLock();
 }
 function closeHelp() { $('help-overlay').classList.add('hidden'); }
@@ -1728,7 +1867,7 @@ const destinations = {
   'airport': {name:'Los Santos International', x:910, z:-815, yaw:Math.PI/2}
 };
 let selectedDestination='los-santos', selectedLoadout=weaponIndex;
-function releasePointerForMenu(){mouseDown=false;if(document.pointerLockElement)document.exitPointerLock();}
+function releasePointerForMenu(){clearInputState();if(document.pointerLockElement)document.exitPointerLock();}
 function openMap(){if(!started)return;paused=true;$('pause-overlay').classList.add('hidden');$('loadout-overlay').classList.add('hidden');$('map-overlay').classList.remove('hidden');releasePointerForMenu();}
 function closeMap(){ $('map-overlay').classList.add('hidden'); if(started)resumeGame(); }
 function openLoadout(){if(!started)return;paused=true;$('pause-overlay').classList.add('hidden');$('map-overlay').classList.add('hidden');selectedLoadout=weaponIndex;updateLoadoutSelection();$('loadout-overlay').classList.remove('hidden');releasePointerForMenu();}
@@ -1781,7 +1920,7 @@ window.addEventListener('mousemove',e=>{
 window.addEventListener('wheel',e=>{if(!started||paused)return;setWeapon(weaponIndex+(e.deltaY>0?1:-1));},{passive:true});
 window.addEventListener('keydown',e=>{
   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab'].includes(e.code))e.preventDefault();
-  keys[e.code]=true;
+  if(started&&!paused)keys[e.code]=true;
   if(e.repeat)return;
   if(e.code==='Escape') {if(!started)return;if(!$('map-overlay').classList.contains('hidden')){closeMap();return;}if(!$('loadout-overlay').classList.contains('hidden')){closeLoadout();return;}if(!$('help-overlay').classList.contains('hidden')){closeHelp();return;}paused?resumeGame():pauseGame();}
   if(e.code==='KeyH'){if(!$('help-overlay').classList.contains('hidden'))closeHelp();else openHelp();}
@@ -1796,8 +1935,21 @@ window.addEventListener('keyup',e=>{keys[e.code]=false;});
 document.addEventListener('pointerlockchange',()=>{
   if(document.pointerLockElement!==canvas){mouseDown=false;cameraDrag=false;}
 });
-window.addEventListener('blur',()=>{mouseDown=false;cameraDrag=false;Object.keys(keys).forEach(k=>keys[k]=false);});
-window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.6));});
+window.addEventListener('blur',clearInputState);
+window.addEventListener('pagehide',clearInputState);
+// Pause safely when the player switches tabs or minimizes the browser. This prevents
+// movement/fire inputs from remaining latched while the game is not visible.
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){
+    clearInputState();
+    if(started&&!paused)pauseGame();
+  }
+});
+window.addEventListener('resize',()=>{
+  const width=Math.max(1,window.innerWidth),height=Math.max(1,window.innerHeight);
+  camera.aspect=width/height;camera.updateProjectionMatrix();
+  renderer.setSize(width,height);
+});
 
 try {
   generateCity(); initActors(); setWeapon(0,true); updateCash(); updateHud(); updateCamera(.016);

@@ -29,3 +29,60 @@ LIMITATIONS / NOT CLAIMED
 - Syntax and ZIP integrity checks do not replace the above manual acceptance tests.
 - Three.js is loaded from a CDN, so initial execution requires internet access.
 - This is an original GTA-inspired prototype; it is not a complete reproduction of all GTA V systems.
+
+
+DOCUMENTATION / ACCESSIBILITY POLISH
+- Added a complete Japanese README with Windows setup, controls, feature scope, environment requirements and honest test limitations.
+- Added TROUBLESHOOTING.md for startup, CDN, WebGL, input, performance and local-server issues.
+- Removed the viewport setting that disabled pinch/browser zoom; added a Japanese page description and dark color-scheme metadata.
+- Core world/gameplay code and original art/layout were intentionally left unchanged in this pass.
+
+VALIDATION
+- Reviewed the changed HTML metadata and documentation against the existing launch files and QA notes.
+- No new gameplay runtime behavior was introduced by this pass.
+- Existing Windows manual acceptance tests listed above remain outstanding; this pass does not claim a full playthrough.
+
+
+GAMEPLAY SAFETY / INPUT RELIABILITY PASS
+- Added a shared input-state reset helper and use it when pausing, opening the help overlay, releasing pointer lock for menus, losing window focus, and leaving the page.
+- Game key states are only latched while gameplay is active, preventing menu/background key presses from becoming movement or fire inputs.
+- Added visibility-change handling: when the browser tab becomes hidden, active gameplay is paused and all held inputs are cleared. The player must explicitly resume.
+- Hardened resize handling against zero-sized viewport values and applies the capped pixel ratio before resizing.
+
+VALIDATION STATUS
+- Source changes were applied to the improvement branch and reviewed against the existing event-handler structure.
+- Full browser/Windows runtime tests remain outstanding; no claim of successful manual gameplay validation is made.
+
+
+RENDERING / PERFORMANCE PASS
+- Added conservative adaptive render resolution: the renderer samples average frame rate over 2.5-second windows and adjusts device pixel ratio gradually. It reduces resolution when measured frame rate falls below 50 FPS, reacts more strongly below 42 FPS, and slowly restores detail above 59 FPS. A cooldown prevents rapid oscillation. The upper DPR remains capped at 1.6 and the lower bound is 0.85 (or the device's native DPR when lower).
+- Reduced the directional shadow map from 1536² to 1024² to reduce shadow rendering cost while retaining soft shadows.
+- Removed redundant pixel-ratio resets on window resize; adaptive quality now owns render resolution.
+- Kept the existing scene, lighting model, camera, world content, materials, gameplay and controls otherwise unchanged.
+
+VALIDATION STATUS
+- Changes are present on the improvement branch.
+- Runtime GPU benchmarks and visual comparisons across integrated/discrete GPUs have not yet been performed. Adaptive thresholds are conservative starting values, not a claim of measured FPS gains on every device.
+
+
+CITY ENVIRONMENT / ROAD SHAPE PASS
+- Rebuilt road ribbons using centripetal Catmull-Rom resampling and smooth tangent-based cross sections. Road surfaces now follow continuous curves instead of connecting coarse control points with visibly angular trapezoids; lane dashes are placed along the resampled centerline.
+- Reworked street trees into layered broadleaf forms with tapered trunks, visible limbs and overlapping rounded crowns. Tree bases now follow cityGroundHeight so they sit on the local terrain instead of a fixed world height.
+- Corrected building parcel orientation to align each building's long side with the local street tangent, using the world/local axis convention of the building geometry. Updated road-sample orientation consistently for nearby parcel placement.
+- Preserved existing district layout, road paths, building placement logic and overall art direction.
+
+VALIDATION STATUS
+- Source changes are committed to the improvement branch.
+- Visual inspection in a running browser and vehicle-driving checks through curved roads are still required. The road resampling increases geometry smoothness; runtime performance and terrain edge cases have not yet been benchmarked.
+
+
+MANHATTAN-INSPIRED SKYLINE PASS
+- Expanded the central-city building style pool with curtain-wall glass towers, stepped/setback towers, prewar limestone-inspired blocks, slender pencil towers, brutalist masses and postmodern profiles.
+- Added architecture-specific silhouettes: repeated setbacks and cornices, vertical curtain-wall mullions, horizontal spandrels, prewar facade piers, and mechanical/crown tiers.
+- Increased central business district height variation and introduced a limited number of taller signature towers among mid-rise buildings, rather than raising every building uniformly.
+- Expanded irregular infill-lot style variety so the skyline does not repeat the same small set of silhouettes.
+- Existing landmarks, road network, gameplay and enterable building logic remain intact.
+
+VALIDATION STATUS
+- Changes are committed to the improvement branch.
+- Geometry generation has been checked at source level. Visual review of skyline density, inter-building intersections, shadow artifacts and frame-time impact in a running browser is still required.
