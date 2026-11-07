@@ -381,6 +381,66 @@ function addBuilding(x,z,bw,bd,height,index,options={}) {
   else if(style==='historic'&&height<32) mesh=new THREE.Mesh(new THREE.BoxGeometry(bw,height,bd),new THREE.MeshStandardMaterial({color:chosen,roughness:.94}));
   else mesh=new THREE.Mesh(new THREE.BoxGeometry(bw,height,bd),buildingMaterial);
   mesh.position.y=height/2;mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);
+  // Manhattan-inspired architecture: distinct massing profiles and facade rhythms,
+  // rather than repeating one rectangular tower with a different window color.
+  const trimMat=mat(style==='prewar'?0xb6a58d:style==='artdeco'?0xc4ad82:0x68777b,.68,.22);
+  const glassAccent=mat(style==='curtainwall'?0x456a78:0x8da7aa,.28,.42);
+  const addTier=(w,d,h,y,material=buildingMaterial)=>{
+    const tier=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);
+    tier.position.set(0,y+h/2,0);tier.castShadow=true;tier.receiveShadow=true;group.add(tier);return tier;
+  };
+  if(height>48 && ['setback','prewar','curtainwall','brutalist','postmodern','pencil'].includes(style)){
+    if(style==='setback'||style==='prewar'||style==='postmodern'){
+      const levels=style==='prewar'?3:2;
+      let previousW=bw,previousD=bd,base=height*(style==='prewar'?.54:.62);
+      for(let tier=0;tier<levels;tier++){
+        const nextW=previousW*rand(.72,.88),nextD=previousD*rand(.74,.9),tierH=height*(style==='prewar'?.14:.18);
+        addTier(nextW,nextD,tierH,base+tier*tierH,buildingMaterial);
+        // Cornice / setback ledges make the profile read clearly against the skyline.
+        const ledge=new THREE.Mesh(new THREE.BoxGeometry(previousW*.99,.55,previousD*.99),trimMat);
+        ledge.position.y=base+tier*tierH+.12;group.add(ledge);
+        previousW=nextW;previousD=nextD;
+      }
+    }else if(style==='brutalist'){
+      const tiers=3;let w=bw*.92,d=bd*.92,y=height*.48;
+      for(let i=0;i<tiers;i++){
+        const h=height*.16;addTier(w,d,h,y,buildingMaterial);
+        const ledge=new THREE.Mesh(new THREE.BoxGeometry(w*1.035,.65,d*1.035),trimMat);ledge.position.y=y+.2;group.add(ledge);
+        w*=rand(.78,.9);d*=rand(.78,.9);y+=h;
+      }
+    }else if(style==='pencil'){
+      // Slender tower with a compact crown and a clearly visible mechanical penthouse.
+      const upper=new THREE.Mesh(new THREE.BoxGeometry(bw*.68,height*.78,bd*.7),buildingMaterial);
+      upper.position.y=height*.89;upper.castShadow=true;upper.receiveShadow=true;group.add(upper);
+      const crown=new THREE.Mesh(new THREE.BoxGeometry(bw*.48,Math.min(12,height*.08),bd*.5),trimMat);
+      crown.position.y=height*1.3;group.add(crown);
+    }
+    if(style==='curtainwall'){
+      // Slim vertical mullions and horizontal spandrels produce a glass office facade.
+      const mullionCount=clamp(Math.floor(bw/3.8),4,13);
+      for(let i=0;i<mullionCount;i++){
+        const xx=-bw*.46+i*(bw*.92/Math.max(1,mullionCount-1));
+        const mullion=new THREE.Mesh(new THREE.BoxGeometry(.16,height*.94,.18),glassAccent);
+        mullion.position.set(xx,height*.5,bd/2+.13);group.add(mullion);
+      }
+      for(let y=8;y<height-3;y+=rand(7,10)){
+        const spandrel=new THREE.Mesh(new THREE.BoxGeometry(bw*1.005,.22,.2),trimMat);
+        spandrel.position.set(0,y,bd/2+.14);group.add(spandrel);
+      }
+    }
+    if(style==='prewar'){
+      // Limestone piers and a pronounced cornice evoke older Manhattan office blocks.
+      const piers=Math.max(3,Math.floor(bw/5));
+      for(let i=0;i<piers;i++){
+        const xx=-bw*.44+i*(bw*.88/Math.max(1,piers-1));
+        const pier=new THREE.Mesh(new THREE.BoxGeometry(.55,height*.88,.48),trimMat);
+        pier.position.set(xx,height*.47,bd/2+.2);group.add(pier);
+      }
+      const cornice=new THREE.Mesh(new THREE.BoxGeometry(bw*1.12,1.5,bd*1.12),trimMat);
+      cornice.position.y=height*.56;group.add(cornice);
+    }
+  }
+
   // Distinct podium, facade piers, floor bands and entrances create different building silhouettes.
   if(style!=='cylindrical'){
     const podiumH=Math.min(4.2,height*.16),podium=new THREE.Mesh(new THREE.BoxGeometry(bw*1.035,podiumH,bd*1.035),mat(style==='brick'?0x6f5146:0x697477,.9,.08));podium.position.y=podiumH/2+.05;group.add(podium);
@@ -578,11 +638,14 @@ function generateCity() {
         if(!lotFree(x,z,width,depth,yaw))continue;
         const radius=Math.hypot(x,z);let h;
         if(route.kind==='oldtown')h=rand(8,25);
-        else if(radius<420)h=rand(32,105);
+        else if(radius<420)h=rand(48,132);
         else h=rand(10,47);
-        if(radius<320&&rng()<.22)h=rand(105,175);
+        // Dense central business district: a varied skyline with a few much taller
+        // signature towers, mid-rise prewar blocks and slender pencil towers.
+        if(radius<360&&rng()<.34)h=rand(125,225);
+        else if(radius<420&&rng()<.16)h=rand(95,155);
         if(route.kind==='market'&&rng()<.48)h=rand(8,20);
-        const styles=route.kind==='oldtown'?['historic','brick','concrete']:radius<420?['glass','modern','artdeco','cylindrical','slab']:['concrete','brick','modern','slab'];
+        const styles=route.kind==='oldtown'?['historic','brick','prewar','concrete']:radius<420?['curtainwall','setback','prewar','pencil','brutalist','postmodern','glass','artdeco','slab']:['concrete','brick','modern','prewar','slab'];
         const style=pick(styles);
         addBuilding(x,z,width,depth,h,index++,{yaw,style});
       }
@@ -594,7 +657,7 @@ function generateCity() {
     const nearest=cityRoadSamples.reduce((best,q)=>Math.hypot(x-q.x,z-q.z)<best.d?{d:Math.hypot(x-q.x,z-q.z),q}:best,{d:Infinity,q:null});
     if(!lotFree(x,z,w,d,nearest.q?nearest.q.yaw:0))continue;
     if(!nearest.q||nearest.d>145)continue;
-    const h=rad<400?rand(35,125):rand(10,44),style=pick(rad<400?['glass','modern','artdeco','cylindrical','slab']:['brick','concrete','modern','historic']);
+    const h=rad<400?rand(48,145):rand(10,44),style=pick(rad<400?['curtainwall','setback','prewar','pencil','brutalist','postmodern','glass','artdeco','slab']:['brick','concrete','modern','historic','prewar']);
     addBuilding(x,z,w,d,h,index++,{yaw:nearest.q.yaw+rand(-.35,.35),style});placed++;
   }
   // Close sparse city-edge gaps with compact, varied perimeter blocks. Keep the whole footprint inside bounds.
