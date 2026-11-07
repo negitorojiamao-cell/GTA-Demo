@@ -1704,15 +1704,19 @@ function startGame() {
   if(started)return; started=true;paused=false;$('start-overlay').classList.add('hidden');$('loading').classList.add('done');
   showToast('街へようこそ — 画面をクリックしてマウス視点を有効化 / Cで後方視点');
 }
+function clearInputState() {
+  mouseDown=false; cameraDrag=false;
+  for(const code of Object.keys(keys)) keys[code]=false;
+}
 function pauseGame() {
-  if(!started)return;paused=true;mouseDown=false;$('pause-overlay').classList.remove('hidden');
+  if(!started)return;paused=true;clearInputState();$('pause-overlay').classList.remove('hidden');
   if(document.pointerLockElement)document.exitPointerLock();
 }
 function resumeGame() {
   paused=false;$('pause-overlay').classList.add('hidden');
 }
 function openHelp() {
-  $('help-overlay').classList.remove('hidden');mouseDown=false;
+  $('help-overlay').classList.remove('hidden');clearInputState();
   if(document.pointerLockElement)document.exitPointerLock();
 }
 function closeHelp() { $('help-overlay').classList.add('hidden'); }
@@ -1728,7 +1732,7 @@ const destinations = {
   'airport': {name:'Los Santos International', x:910, z:-815, yaw:Math.PI/2}
 };
 let selectedDestination='los-santos', selectedLoadout=weaponIndex;
-function releasePointerForMenu(){mouseDown=false;if(document.pointerLockElement)document.exitPointerLock();}
+function releasePointerForMenu(){clearInputState();if(document.pointerLockElement)document.exitPointerLock();}
 function openMap(){if(!started)return;paused=true;$('pause-overlay').classList.add('hidden');$('loadout-overlay').classList.add('hidden');$('map-overlay').classList.remove('hidden');releasePointerForMenu();}
 function closeMap(){ $('map-overlay').classList.add('hidden'); if(started)resumeGame(); }
 function openLoadout(){if(!started)return;paused=true;$('pause-overlay').classList.add('hidden');$('map-overlay').classList.add('hidden');selectedLoadout=weaponIndex;updateLoadoutSelection();$('loadout-overlay').classList.remove('hidden');releasePointerForMenu();}
@@ -1781,7 +1785,7 @@ window.addEventListener('mousemove',e=>{
 window.addEventListener('wheel',e=>{if(!started||paused)return;setWeapon(weaponIndex+(e.deltaY>0?1:-1));},{passive:true});
 window.addEventListener('keydown',e=>{
   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab'].includes(e.code))e.preventDefault();
-  keys[e.code]=true;
+  if(started&&!paused)keys[e.code]=true;
   if(e.repeat)return;
   if(e.code==='Escape') {if(!started)return;if(!$('map-overlay').classList.contains('hidden')){closeMap();return;}if(!$('loadout-overlay').classList.contains('hidden')){closeLoadout();return;}if(!$('help-overlay').classList.contains('hidden')){closeHelp();return;}paused?resumeGame():pauseGame();}
   if(e.code==='KeyH'){if(!$('help-overlay').classList.contains('hidden'))closeHelp();else openHelp();}
@@ -1796,8 +1800,22 @@ window.addEventListener('keyup',e=>{keys[e.code]=false;});
 document.addEventListener('pointerlockchange',()=>{
   if(document.pointerLockElement!==canvas){mouseDown=false;cameraDrag=false;}
 });
-window.addEventListener('blur',()=>{mouseDown=false;cameraDrag=false;Object.keys(keys).forEach(k=>keys[k]=false);});
-window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.6));});
+window.addEventListener('blur',clearInputState);
+window.addEventListener('pagehide',clearInputState);
+// Pause safely when the player switches tabs or minimizes the browser. This prevents
+// movement/fire inputs from remaining latched while the game is not visible.
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){
+    clearInputState();
+    if(started&&!paused)pauseGame();
+  }
+});
+window.addEventListener('resize',()=>{
+  const width=Math.max(1,window.innerWidth),height=Math.max(1,window.innerHeight);
+  camera.aspect=width/height;camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.6));
+  renderer.setSize(width,height);
+});
 
 try {
   generateCity(); initActors(); setWeapon(0,true); updateCash(); updateHud(); updateCamera(.016);
