@@ -74,3 +74,15 @@ CITY ENVIRONMENT / ROAD SHAPE PASS
 VALIDATION STATUS
 - Source changes are committed to the improvement branch.
 - Visual inspection in a running browser and vehicle-driving checks through curved roads are still required. The road resampling increases geometry smoothness; runtime performance and terrain edge cases have not yet been benchmarked.
+
+
+MANHATTAN-INSPIRED SKYLINE PASS
+- Expanded the central-city building style pool with curtain-wall glass towers, stepped/setback towers, prewar limestone-inspired blocks, slender pencil towers, brutalist masses and postmodern profiles.
+- Added architecture-specific silhouettes: repeated setbacks and cornices, vertical curtain-wall mullions, horizontal spandrels, prewar facade piers, and mechanical/crown tiers.
+- Increased central business district height variation and introduced a limited number of taller signature towers among mid-rise buildings, rather than raising every building uniformly.
+- Expanded irregular infill-lot style variety so the skyline does not repeat the same small set of silhouettes.
+- Existing landmarks, road network, gameplay and enterable building logic remain intact.
+
+VALIDATION STATUS
+- Changes are committed to the improvement branch.
+- Geometry generation has been checked at source level. Visual review of skyline density, inter-building intersections, shadow artifacts and frame-time impact in a running browser is still required.
