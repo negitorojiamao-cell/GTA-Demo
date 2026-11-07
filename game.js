@@ -153,7 +153,7 @@ scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffdfbb, 2.1);
 sun.position.set(-250, 420, 180);
 sun.castShadow = true;
-sun.shadow.mapSize.set(1536, 1536);
+sun.shadow.mapSize.set(1024, 1024); // Lower shadow fill cost while retaining soft directional shadows.
 sun.shadow.camera.left = -520; sun.shadow.camera.right = 520;
 sun.shadow.camera.top = 520; sun.shadow.camera.bottom = -520;
 sun.shadow.camera.near = 10; sun.shadow.camera.far = 1050;
