@@ -114,8 +114,34 @@ scene.background = new THREE.Color(0x8c9da4);
 scene.fog = new THREE.FogExp2(0x8c9da4, 0.00105);
 const camera = new THREE.PerspectiveCamera(67, 1, 0.1, 2400);
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
+// Adaptive render resolution: preserve crisp output on fast systems and lower GPU
+// pixel cost gradually when the scene becomes expensive. DPR is never allowed to
+// exceed 1.6, and hysteresis avoids quality oscillation around the target frame rate.
+const maxRenderPixelRatio = Math.min(window.devicePixelRatio || 1, 1.6);
+const minRenderPixelRatio = Math.min(maxRenderPixelRatio, 0.85);
+let renderPixelRatio = maxRenderPixelRatio;
+let renderSampleTime = 0, renderSampleFrames = 0;
+let renderQualityCooldown = 0;
+renderer.setPixelRatio(renderPixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
+function updateAdaptiveRenderQuality(dt) {
+  renderSampleTime += dt;
+  renderSampleFrames++;
+  renderQualityCooldown = Math.max(0, renderQualityCooldown - dt);
+  if (renderSampleTime < 2.5 || renderQualityCooldown > 0) return;
+  const fps = renderSampleFrames / Math.max(.001, renderSampleTime);
+  let nextRatio = renderPixelRatio;
+  if (fps < 42) nextRatio = Math.max(minRenderPixelRatio, renderPixelRatio - .16);
+  else if (fps < 50) nextRatio = Math.max(minRenderPixelRatio, renderPixelRatio - .08);
+  else if (fps > 59) nextRatio = Math.min(maxRenderPixelRatio, renderPixelRatio + .05);
+  if (Math.abs(nextRatio - renderPixelRatio) >= .015) {
+    renderPixelRatio = nextRatio;
+    renderer.setPixelRatio(renderPixelRatio);
+    renderQualityCooldown = 3.5;
+  }
+  renderSampleTime = 0;
+  renderSampleFrames = 0;
+}
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -1687,6 +1713,7 @@ function recenterCamera() {
 function animate() {
   requestAnimationFrame(animate);
   const dt=Math.min(clock.getDelta(),.05);
+  updateAdaptiveRenderQuality(dt);
   if(started&&!paused) {
     gameTime+=dt;
     updatePlayer(dt);updateTraffic(dt);updatePedestrians(dt);updateAircraft(dt);updateAirportAirliners(dt);updatePolice(dt);updateBombs(dt);updateExplosions(dt);updateEnemies(dt);updateMission(dt);updateWanted(dt);updateEffects(dt);
@@ -1813,7 +1840,6 @@ document.addEventListener('visibilitychange',()=>{
 window.addEventListener('resize',()=>{
   const width=Math.max(1,window.innerWidth),height=Math.max(1,window.innerHeight);
   camera.aspect=width/height;camera.updateProjectionMatrix();
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.6));
   renderer.setSize(width,height);
 });
 
