@@ -1,0 +1,31 @@
+BUILD 1.2 QA REPORT
+===================
+
+STATIC CHECKS
+PASS — JavaScript syntax checked with node --check.
+PASS — Required local files remain present: launch.bat, server.ps1, index.html, game.js, style.css.
+PASS — index.html references style.css and game.js; launch.bat references server.ps1.
+PASS — Final ZIP archive checked with unzip -t.
+
+FEATURE ADDITIONS
+- Added pointer-lock mouse-look after clicking the game viewport, while retaining right-button drag fallback.
+- Added a 30-second stop at the existing airliner terminal gate after its landing/taxi-in route.
+- Added contextual boarding countdown / flight-control hint.
+- Added E boarding and E disembarking for the airport airliner. Disembarking requires ground contact, low speed and land (not ocean).
+- Added fixed-wing acceleration, braking, turn, pitch and altitude movement. Airport autopilot pauses while piloted; after landing and exiting the plane stays parked.
+- The prior city, bridges, cars, helicopter, NPCs, missions, weapon systems and airport plane model/route were retained.
+
+MANUAL ACCEPTANCE TESTS STILL REQUIRED ON WINDOWS
+1. Open the game, click the viewport, move the mouse and confirm the camera follows mouse movement; test right-drag fallback.
+2. Go to the airport and observe the airliner land, taxi to the terminal and remain stopped for 30 seconds.
+3. Approach within the aircraft boarding range while stopped; confirm the HUD countdown and E boarding.
+4. Use W to accelerate; verify A/D turn, Space raises the nose and gains altitude at sufficient speed, Shift lowers the nose and descends.
+5. Land on land/runway, reduce speed using S, then use E to disembark. Verify the player reappears and the aircraft stays parked.
+6. Verify car controls, bridges and other existing systems continue working.
+
+LIMITATIONS / NOT CLAIMED
+- A Chromium headless smoke-test attempt timed out before it captured the DOM; this is not counted as a successful browser test.
+- This environment cannot certify real Windows/browser playthrough, WebGL frame behavior, or Pointer Lock permissions.
+- Syntax and ZIP integrity checks do not replace the above manual acceptance tests.
+- Three.js is loaded from a CDN, so initial execution requires internet access.
+- This is an original GTA-inspired prototype; it is not a complete reproduction of all GTA V systems.

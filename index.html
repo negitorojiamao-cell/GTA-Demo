@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#080d14">
+<title>NEON DISTRICT — 3D Open World</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="game-shell">
+  <canvas id="game" aria-label="NEON DISTRICT 3D game world"></canvas>
+  <div id="topbar">
+    <div class="brand"><span class="brand-mark">N</span><div><div class="brand-name">NEON DISTRICT</div><div class="brand-sub">OPEN WORLD / 3D BUILD 1.2</div></div></div>
+    <div class="top-stats"><div class="stat"><span class="stat-label">CASH</span><strong id="cash">$ 2,500</strong></div><div class="stat"><span class="stat-label">CITY REP</span><strong id="rep">LV. 1</strong></div><button id="map-btn" class="top-action" title="マップを開く (M)">MAP <span>M</span></button><button id="loadout-btn" class="top-action" title="武器選択 (TAB)">武器 <span>TAB</span></button><button id="pause-btn" class="icon-btn" title="一時停止 (Esc)" aria-label="一時停止">Ⅱ</button></div>
+  </div>
+  <div id="mission-panel" class="glass-panel">
+    <div class="eyebrow"><span class="live-dot"></span> CURRENT JOB</div>
+    <div class="mission-title" id="mission-title">街を横断する</div>
+    <div class="mission-desc" id="mission-desc">黄色いリングの目的地へ向かえ。</div>
+    <div class="mission-bottom"><span id="mission-distance">距離を計算中</span><span id="mission-time">OPEN CONTRACT</span></div>
+    <div class="progress-track"><div id="mission-progress"></div></div>
+  </div>
+  <div id="wanted-panel" aria-label="手配度"><span class="wanted-label">WANTED</span><span id="stars">☆☆☆☆☆</span></div>
+  <div id="minimap-panel" class="glass-panel"><div class="panel-head"><span>LOCAL MAP</span><span class="map-north">N ↑</span></div><canvas id="minimap" width="180" height="180"></canvas><div class="map-legend"><span><i class="legend-player"></i> YOU</span><span><i class="legend-target"></i> JOB</span></div></div>
+  <div id="status-panel" class="glass-panel">
+    <div class="status-head"><span>CONDITION</span><span id="vehicle-status">ON FOOT</span></div>
+    <div class="health-row"><span>HEALTH</span><div class="health-track"><div id="health-fill"></div></div><b id="health-text">100%</b></div>
+    <div class="status-foot"><span id="speed-label">SPEED <b>0</b> km/h</span><span id="zone-label">DOWNTOWN</span></div>
+  </div>
+  <div id="weapon-panel" class="glass-panel">
+    <div class="weapon-top"><span class="eyebrow">EQUIPPED</span><span class="weapon-slot" id="weapon-slot">01</span></div>
+    <div class="weapon-main"><div class="weapon-icon" id="weapon-icon">◈</div><div class="weapon-meta"><strong id="weapon-name">PISTOL</strong><span id="weapon-desc">SIDEARM / SEMI</span></div></div>
+    <div class="ammo-row"><span id="ammo-label">AMMO</span><strong id="ammo-count">12 <i>/ 60</i></strong></div>
+    <div class="weapon-slots"><span data-slot="0" class="slot active">1</span><span data-slot="1" class="slot">2</span><span data-slot="2" class="slot">3</span><span data-slot="3" class="slot">4</span><span class="slot-hint">SCROLL TO SWITCH</span></div>
+  </div>
+  <div id="crosshair"><i></i><i></i><i></i><i></i><b></b></div>
+  <div id="toast" role="status"></div>
+  <div id="start-overlay" class="overlay">
+    <div class="overlay-card start-card">
+      <div class="hero-kicker"><span class="live-dot"></span> AN OPEN WORLD TO EXPLORE</div>
+      <h1>NEON<br><em>DISTRICT</em></h1>
+      <p class="hero-copy">旧市街の曲がりくねった路地、新旧の大通り、斜めに横切る鉄道、川・丘・三角形の街区。<br>塔や高層ビルを巡り、建物の中へ入り、駐車場に車を停め、屋上からヘリを操縦しよう。</p>
+      <div class="feature-row"><div><b>01</b><span>3D OPEN WORLD</span></div><div><b>02</b><span>WEAPON LOADOUT</span></div><div><b>03</b><span>INDOORS / GARAGE / HELI</span></div></div>
+      <button id="start-btn" class="primary-btn">街に入る <span>→</span></button>
+      <div class="start-note">オリジナル3Dオープンワールド BUILD 1.2 / 初回起動にはインターネット接続が必要</div>
+    </div>
+  </div>
+  <div id="map-overlay" class="overlay hidden"><div class="overlay-card destination-card"><button id="map-close" class="close-btn" aria-label="閉じる">×</button><div class="eyebrow">SAN ANDREAS / DESTINATIONS</div><h2>行き先を選択</h2><p>GTA Vのロケーションを参考にした目的地へ移動します。公式マップの完全複製ではなく、独自の3Dワールド内の移動ポイントです。</p><div class="destination-layout"><div class="destination-map" id="destination-map"><div class="map-water">PACIFIC OCEAN</div><div class="map-land"></div><button class="map-pin pin-los" data-destination="los-santos">LOS SANTOS</button><button class="map-pin pin-vine" data-destination="vinewood">VINEWOOD</button><button class="map-pin pin-del" data-destination="del-perro">DEL PERRO</button><button class="map-pin pin-sandy" data-destination="sandy-shores">SANDY SHORES</button><button class="map-pin pin-chiliad" data-destination="mount-chiliad">MT. CHILIAD</button><button class="map-pin pin-paleto" data-destination="paleto-bay">PALETO BAY</button><button class="map-pin pin-airport" data-destination="airport">AIRPORT</button></div><div class="destination-list"><button class="destination-option selected" data-destination="los-santos"><b>Los Santos</b><span>ダウンタウン / 高層ビル街</span></button><button class="destination-option" data-destination="old-town"><b>Old Town / Hotel</b><span>旧市街・入室できるホテル</span></button><button class="destination-option" data-destination="garage"><b>Downtown Parking Garage</b><span>立体駐車場・屋上ヘリポート</span></button><button class="destination-option" data-destination="vinewood"><b>Vinewood</b><span>丘と豪華な住宅街</span></button><button class="destination-option" data-destination="del-perro"><b>Del Perro</b><span>海岸・ビーチエリア</span></button><button class="destination-option" data-destination="sandy-shores"><b>Sandy Shores</b><span>砂漠の町</span></button><button class="destination-option" data-destination="mount-chiliad"><b>Mount Chiliad</b><span>山岳地帯</span></button><button class="destination-option" data-destination="paleto-bay"><b>Paleto Bay</b><span>北部の海沿いの町</span></button><button class="destination-option" data-destination="airport"><b>Los Santos International</b><span>空港・滑走路エリア</span></button><button id="travel-btn" class="primary-btn">ここへ移動 <span>→</span></button></div></div></div></div>
+  <div id="loadout-overlay" class="overlay hidden"><div class="overlay-card loadout-card"><button id="loadout-close" class="close-btn" aria-label="閉じる">×</button><div class="eyebrow">WEAPON WHEEL / LOADOUT</div><h2>武器選択</h2><p>装備したい武器を選択。数字キー 1–4 またはマウスホイールでも切り替えられます。</p><div class="loadout-grid"><button class="loadout-item selected" data-weapon="0"><span class="loadout-number">01</span><span class="loadout-glyph">⌁</span><b>PISTOL</b><small>12 / 60 · セミオート</small></button><button class="loadout-item" data-weapon="1"><span class="loadout-number">02</span><span class="loadout-glyph">≋</span><b>SMG</b><small>30 / 150 · フルオート</small></button><button class="loadout-item" data-weapon="2"><span class="loadout-number">03</span><span class="loadout-glyph">╾</span><b>SHOTGUN</b><small>8 / 48 · 近距離</small></button><button class="loadout-item" data-weapon="3"><span class="loadout-number">04</span><span class="loadout-glyph">⌗</span><b>RIFLE</b><small>30 / 120 · 中長距離</small></button></div><div class="loadout-footer"><span id="loadout-selected-label">選択中：PISTOL</span><button id="equip-btn" class="primary-btn">この武器を装備 <span>→</span></button></div></div></div>
+  <div id="pause-overlay" class="overlay hidden">
+    <div class="overlay-card small-card"><div class="eyebrow">PAUSED</div><h2>一時停止中</h2><p>街は逃げない。ひと息つこう。</p><button id="resume-btn" class="primary-btn">ゲームに戻る <span>→</span></button><button id="restart-btn" class="secondary-btn">最初からやり直す</button></div>
+  </div>
+  <div id="help-overlay" class="overlay hidden">
+    <div class="overlay-card small-card help-card"><button id="help-close" class="close-btn" aria-label="閉じる">×</button><div class="eyebrow">FIELD GUIDE</div><h2>操作ガイド</h2><div class="control-list"><div><kbd>W A S D</kbd><span>W前進・S後退・A左・D右（徒歩・運転）</span></div><div><kbd>マウス移動</kbd><span>ゲーム画面をクリックして視点操作を有効化。右ドラッグも使用可能</span></div><div><kbd>C</kbd><span>カメラを後方視点へ戻す</span></div><div><kbd>F</kbd><span>キーボード射撃（押しっぱなしで連射）</span></div><div><kbd>左クリック</kbd><span>マウスでも射撃</span></div><div><kbd>1–4 / ホイール</kbd><span>武器切り替え</span></div><div><kbd>R</kbd><span>リロード</span></div><div><kbd>E</kbd><span>車に乗る／降りる・近くの建物に入る・駐車場エレベーター・ヘリ搭乗</span></div><div><kbd>SHIFT</kbd><span>ダッシュ</span></div><div><kbd>SPACE</kbd><span>徒歩中は射撃 / 車内では急ブレーキ</span></div><div><kbd>HELICOPTER</kbd><span>駐車場屋上ヘリポートへは、駐車場のリフト前でE。ヘリ搭乗後：W/S移動、A/D旋回、Space上昇、Shift下降</span></div><div><kbd>BUILDINGS</kbd><span>旧市街ホテル・市民資料館の入口付近でE。室内でEを押すと外へ出る</span></div><div><kbd>AIRPORT</kbd><span>Mキーで空港へ。着陸後、旅客機はターミナル付近で30秒停車。停車中に近づいてEで搭乗</span></div><div><kbd>旅客機</kbd><span>搭乗後：W加速・S減速・A/D旋回・Space上昇・Shift下降。地上に着陸して減速後、Eで降機</span></div><div><kbd>衝突 / WANTED</kbd><span>車で歩行者や車に衝突すると手配度が上がり、警察車両が追跡し警察官が発砲する</span></div><div><kbd>FREEWAY</kbd><span>市街地の南側。6車線の高架・出口ランプ・交通車両</span></div><div><kbd>CITY</kbd><span>旧市街の細い路地、斜めの大通り、鉄道、川沿いの道、高低差のある丘、三角形の区画と不整形の広場</span></div><div><kbd>ROADS</kbd><span>カーブした一般道と6車線の高架フリーウェイ。東側は丘陵地帯</span></div><div><kbd>H</kbd><span>この操作ガイド</span></div><div><kbd>海岸 / 山道</kbd><span>街の外へ進むと海岸線、駐車場、起伏のある山道に入れる</span></div><div><kbd>ESC</kbd><span>一時停止</span></div></div><p class="help-tip">黄色いマーカーに着くと仕事完了。歩行者や車両の当たり判定があり、高速で歩行者に衝突すると手配度が上昇。警察は追跡して射撃する。</p><button id="help-ok" class="primary-btn">了解 <span>→</span></button></div>
+  </div>
+  <div id="aircraft-hint" class="hidden" role="status" aria-live="polite"></div>
+  <div id="bottom-hint"><span class="keycap">W A S D</span> 移動 <span class="hint-sep">/</span> <span class="keycap">マウス移動</span> 視点 <span class="hint-sep">/</span> <span class="keycap">E</span> 乗降</div>
+  <button id="help-btn" class="help-floating" title="操作ガイド (H)">?</button>
+  <div id="loading"><span class="loader"></span><span>BUILDING YOUR CITY…</span></div>
+</div>
+<script>
+  const bootError = (message) => {
+    const loading = document.getElementById('loading');
+    if (!loading) return;
+    loading.innerHTML = '<div style="max-width:520px;padding:24px;line-height:1.8;text-align:center"><strong>ゲームを読み込めませんでした</strong><br>' +
+      'Three.jsの読み込みに失敗した可能性があります。インターネット接続を確認してからページを再読み込みしてください。<br><small style="color:#8e9d9e">' + String(message).replace(/[<>&]/g, '') + '</small></div>';
+    loading.classList.remove('done');
+  };
+  window.addEventListener('unhandledrejection', e => {
+    const message = String(e.reason || 'Unknown startup error');
+    if (/import|fetch|module|network/i.test(message)) bootError(message);
+  });
+  window.addEventListener('error', e => {
+    if (/game\.js|module|WebGL/i.test(String(e.message || ''))) bootError(e.message);
+  });
+</script>
+<script type="module" src="game.js"></script>
+</body>
+</html>
